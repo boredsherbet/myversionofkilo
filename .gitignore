@@ -1,2 +1,68 @@
 node_modules/
 env
+# Ignore object files and executable
+*.o
+*.a
+*.so
+*.exe
+
+# Ignore temporary files
+*~
+*.swp
+*.swo
+
+# Ignore backup files
+*.bak
+*.orig
+*.save
+
+# Ignore generated files
+*.d
+*.out
+
+# Ignore dependency files
+*.d
+
+# Ignore core dumps
+core
+
+# Ignore compiled files
+*.dll
+*.dylib
+
+# Ignore logs and databases
+*.log
+*.sql
+*.sqlite
+
+# Ignore build directories
+/build/
+/Debug/
+/Release/
+/dist/
+/bin/
+/obj/
+/lib/
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore IDE specific files
+/.idea/
+/.vscode/
+/*.code-workspace
+
+# Ignore other specific files and directories
+*.tar.gz
+*.zip
+*.tar.bz2
+*.tar
+*.gz
+*.tgz
+*.bz2
+*.xz
+
+# Ignore makefiles and related files
+Makefile.in
+Makefile.am
