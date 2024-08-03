@@ -7,6 +7,7 @@
 #include <termios.h>
 /* defines */
 #define CTRL_KEY(k) ((k) & 0x1f)
+//this define statement works for arbitrary value k
 /* terminal stuff */
 struct termios og_termios;
 void die(const char *s){
@@ -14,6 +15,7 @@ void die(const char *s){
     exit(1);
 }
 void closekilo(){
+    //this function does exit stuff
     if (tcsetattr(STDERR_FILENO,TCSAFLUSH,&og_termios)==-1){die("tcsetarr");}
     // just resetting the terminal
 }
@@ -22,11 +24,18 @@ void removeFlags(struct termios *old){
     old->c_lflag&= ~(ECHO | IEXTEN | ICANON | ISIG);
     old->c_oflag&= ~(OPOST);
     old->c_iflag&= ~(IXON | BRKINT | INPCK | ISTRIP | ICRNL);
-    old->c_cflag&= ~(CS8); 
-    //turns off a bunch of flags, and sets charset to CS8
+    old->c_cflag&= ~(CS8); //not a flag, sets to 8 bit charset
+    // old->c_lflag&= ~(ECHO); 
+    // modifies the c_lflag value, which is a sequenece of bits
+    // oneof those bits controls ECHO (ECHO is a bitflag)
+    // we pull the value of echo, then invert it
+    // which produces a value where it's all 1s, except for ECHO
+    // anding that against c_lflag will prouce something that preserves
+    // all other values in c_lflag, while flipping ECHO (which became 0 due to inversion)
+    // ~(ECHO | ICANON) just lets there be two bits that have 0s after inversion (2 things get turned off)
     if ((tcsetattr(STDIN_FILENO,TCSAFLUSH,old))==-1){
         die("tcsetattr");
-    } //modify state of terminal, die if fails.
+    } //add changes to terminal, die if fails.
 }
 
 /* init */
