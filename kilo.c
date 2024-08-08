@@ -35,6 +35,7 @@ void initEditor(){
 void die(const char *s){
     write(STDOUT_FILENO,"\x1b[2J",4);
     write(STDOUT_FILENO,"\x1b[H",3);
+    printf("I died.\r\n");
     perror(s);
     exit(1);
 }
@@ -54,17 +55,23 @@ void removeFlags(struct termios *old){
     } //modify state of terminal, die if fails.
 }
 int getCursorPos(int *rows, int *columns){
-    if (write(STDOUT_FILENO, "\x1b[6n",3)==-1) return -1;
+    if (write(STDOUT_FILENO, "\x1b[6n",4)==-1) return -1;
     printf("\r\n");
     char buffer[32];
-    unsigned int i=1;
+    unsigned int i=0;
     while (i<sizeof(buffer)){//reads from standard input
         if (read(STDIN_FILENO,&buffer[i],1)!=1){break;}//get out if we're done reading stuff
         if (buffer[i]=='R'){break;}//or if we hit the R
         i++;//next character
     }
     buffer[i]='\0';//install the null character at the end of the buffer-- C string!
-    printf("\r\nPointer at: %s",&buffer[1]);//remember first character is escape, so we skip it.
+    printf("\r\nPointer at: %s\r\n",&buffer[1]);//remember first character is escape, so we skip it.
+    if (buffer[0]!='\x1b' || buffer[1]!='[') {
+        die("getCursorPos");
+    }
+    if (sscanf(&buffer[2], "%d;%d", rows, columns) != 2) {
+        return -1;
+    }
     readKeys();
     return -1;
 }
