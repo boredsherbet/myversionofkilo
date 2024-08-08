@@ -45,7 +45,7 @@ int main() {
     struct termios now_termios=og_termios; //maintains current state of terminal
     removeFlags(&now_termios); //enable raw input
     char c;
-    printf("Type a key to find it's ascii code.\r\n");
+    printf("Type a key to find it's ascii code.\r\nUse Ctrl+Q to exit.\r\n");
     while (1){
         if (read(STDIN_FILENO, &c, 1)==-1 && errno!=EAGAIN){die("read");}
         //apparently errno is how C does error checking... weird...
