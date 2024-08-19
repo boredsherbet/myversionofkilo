@@ -12,6 +12,18 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define BUFFER_INIT {NULL,0}
 #define VERSION "0.0.1"
+/* Editor keys enum */
+enum editorKey{
+    ARROW_LEFT = 1000,
+    ARROW_RIGHT,
+    ARROW_DOWN, 
+    ARROW_UP,
+    PAGE_UP,
+    PAGE_DOWN,
+    HOME_KEY,
+    END_KEY,
+    DEL_KEY
+};
 
 /* structs*/
 struct editorConf{//it'll be easier to store global state this way instead of random vars
@@ -26,13 +38,13 @@ struct buffer{//this will be a dynamic string that we use as a buffer.
     int len;
 };
 /* function prototypes */ //man i hate using C purely because of function prototypes... I planned not to use these but the dependencies are getting too confusing....
-void movecursor(char key);
+void movecursor(int key);
 void initEditor();//initializes editor object that saves stuff about terminal
 void die(const char *s);//everything went wrong, print message for info and kys (the program)
 void closeKilo();//closes everything
 void removeFlags(struct termios *old);//resets terminal
 int getCursorPos(int *rows, int *columns);//gets the position of the cursor
-char readKeys();//reads the key presses
+int readKeys();//reads the key presses
 int getWindowSize(int *rows, int *columns);//gets the size of the window
 void processKeys();//processes key presses (and calls readkeys to read them)
 void drawRows();//draws the tildes, for now
@@ -89,13 +101,52 @@ int getCursorPos(int *rows, int *columns){
     return 0;
 }
 
-char readKeys(){
+int readKeys(){
     char c;
-    while (1){
-        if (read(STDIN_FILENO, &c, 1)==-1 && errno!=EAGAIN){die("read");}
+    while (read(STDIN_FILENO, &c, 1)==-1){ //enters the while loop if no character is read
+        if (errno!=EAGAIN){die("read");}
         //apparently errno is how C does error checking... weird...
-        return c;
     }
+    if (c=='\x1b'){
+        char seq[4];//we'll have this be the [A or [B or [C or [D for arrow keys
+        if(read(STDIN_FILENO, &seq[0], 1)!=1){return c;}//it's a 3 char sequence, 
+        if(read(STDIN_FILENO, &seq[1], 1)!=1){return c;}//again, 3 char sequence...
+        if (seq[0]=='['){//it's a properly formatted escape sequence
+            if (seq[1]>='0' &&seq[1]<='9'){ //there's a number in second position
+                if(read(STDIN_FILENO, &seq[2], 1)!=1){return c;}//third position?
+                if(seq[2]=='~'){//will be none if nothing is read...
+                    switch(seq[1]){
+                        case '5': return PAGE_UP;
+                        case '6': return PAGE_DOWN;
+                        case '1': return HOME_KEY;
+                        case '8': return END_KEY;
+                        case '3': return DEL_KEY;
+                        case '7': return HOME_KEY;
+                        case '4': return END_KEY;
+                    }
+                }
+            } else{//there's no number in second position (aka there's a letter there)
+                switch(seq[1]){//single character escape sequences
+                    case 'A': return ARROW_UP;//up arrow key
+                    case 'B': return ARROW_DOWN;//down arrow key
+                    case 'C': return ARROW_RIGHT;//right arrow key
+                    case 'D': return ARROW_LEFT;//left arrow key
+                    case 'H': return HOME_KEY;
+                    case 'F': return END_KEY;
+                }
+            }
+            return '\x1b';// bracket read in on accident
+        } else if(seq[0]=='O'){//does not start with bracket
+            switch(seq[1]){
+                case 'H': return HOME_KEY;
+                case 'F': return END_KEY;
+            }
+            return '\x1b';//O got read in on accident
+        } else {
+            return c;
+        }
+    }
+    return c;
 }
 
 int getWindowSize(int *rows, int *columns){//this way we can get rows and cols to work with directly, instead of having to deal with the window struct
@@ -111,44 +162,63 @@ int getWindowSize(int *rows, int *columns){//this way we can get rows and cols t
     //but sometimes ioctl doesn't work (eg. with windows...)
 }
 void processKeys(){
-    char c=readKeys();
+    int c=readKeys();
     switch (c) {
         case CTRL_KEY('q'): 
             write(STDOUT_FILENO,"\x1b[2J",4);
             write(STDOUT_FILENO,"\x1b[H",3);
             exit(0);
             break;
-        case 'w':
-        case 'a':
-        case 's':
-        case 'd':
+        case ARROW_UP:
+        case ARROW_DOWN:
+        case ARROW_LEFT:
+        case ARROW_RIGHT:
+        case PAGE_UP:
+        case PAGE_DOWN:
+        case HOME_KEY:
+        case END_KEY:
             movecursor(c);
             break;
     }
 }
-void movecursor(char key){
+void movecursor(int key){
     switch(key) {
-        case 'a'://cursor left
+        case ARROW_LEFT://cursor left
             if (Editor.cursorx!=0){
                 Editor.cursorx--;
             }
             break;
-        case 'w'://cursor up
+        case ARROW_UP://cursor up
             if (Editor.cursory!=0){
                 Editor.cursory--;
             }
             break;
-        case 's': 
-            if (Editor.cursory<Editor.screenheight){
+        case ARROW_DOWN: 
+            if (Editor.cursory<Editor.screenheight-1){
                 Editor.cursory++;
             }
             break;
-        case 'd':
-            if (Editor.cursorx<Editor.screenwidth){
+        case ARROW_RIGHT:
+            if (Editor.cursorx<Editor.screenwidth-1){
                 Editor.cursorx++;
             }
             break;
+        case PAGE_DOWN:
+        case PAGE_UP:{
+            int times = Editor.screenheight;
+            while (times--){
+                movecursor(key==PAGE_UP?ARROW_UP:ARROW_DOWN);
+            }
+            break;
+        }
+        case HOME_KEY:
+            Editor.cursorx=0;
+            break;
+        case END_KEY:
+            Editor.cursorx=Editor.screenwidth-1;
+            break;
     }
+
 }
 void drawrows(struct buffer *buff){
     for (int y=0; y<Editor.screenheight; y++){//for every line in the height
