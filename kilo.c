@@ -37,12 +37,16 @@ typedef struct erow{
 } erow;
 struct editorConf{//it'll be easier to store global state this way instead of random vars
     struct termios og_termios;//it's really making me mad that termios doesn't have an n...
-    int cursorx;
-    int cursory;
-    int screenwidth; 
-    int screenheight;
-    int numrows;
-    erow *rows;
+    int cursorx;//columnal position of cursor in editor
+    int cursory;//row position of cursor in editor
+    //NOTE: cursor position in a file requires use of rowoffset or columnoffset.
+    // the cursorx and cursory variables are the position in the editor's window pane
+    int screenwidth;//tracks the number of columns/width of the editor
+    int screenheight;//tracks the height of the editor
+    int numrows;//tracks the number of rows in the text
+    int rowoffset;//used for vertical scrolling purposes
+    int coloffset;//used for horizontal scrolling purposes
+    erow *rows; //stores all the rows on the editor.
 };
 struct buffer{//this will be a dynamic string that we use as a buffer.
     char *string;
@@ -64,7 +68,8 @@ void refreshScreen();//working on this one
 void setFlags();//sets terminal flags to the values we need to build and run text editor
 void bufferAppend(struct buffer *buffer, const char *string,int len ); // dynamic string append
 void freeBuffer(struct buffer *buffer); //frees buffer memory
-void openEditor();//opens an editor. no file input yet, but that will probably be a parameter later
+void openEditor(char *filename);
+//opens an editor. no file input yet, but that will probably be a parameter later
 struct editorConf Editor;
 
 void initEditor(){
@@ -74,6 +79,8 @@ void initEditor(){
     Editor.cursorx=0;
     Editor.cursory=0;
     Editor.numrows=0;
+    Editor.rowoffset=0;
+    Editor.coloffset=0;
     Editor.rows=NULL; //npd if we fork up.
 }
 void die(const char *s){
@@ -201,23 +208,38 @@ void movecursor(int key){
     switch(key) {
         case ARROW_LEFT://cursor left
             if (Editor.cursorx!=0){
-                Editor.cursorx--;
+                Editor.cursorx--;//move left
+            } else if(Editor.cursorx+Editor.coloffset!=0){
+                Editor.coloffset--;//scroll left
+                refreshScreen();
             }
             break;
         case ARROW_UP://cursor up
-            if (Editor.cursory!=0){
-                Editor.cursory--;
+            if (Editor.cursory!=0){ 
+                Editor.cursory--;//move up
+            } else if(Editor.rowoffset!=0){
+                Editor.rowoffset--;//scroll up
+                refreshScreen();
             }
             break;
         case ARROW_DOWN: 
             if (Editor.cursory<Editor.screenheight-1){
-                Editor.cursory++;
+                Editor.cursory++;//move down
+            } else if(Editor.rowoffset+Editor.cursory<Editor.numrows){
+                //position of cursor in file is offset+pos in editor
+                Editor.rowoffset++;//scroll down
+                refreshScreen();
             }
             break;
         case ARROW_RIGHT:
             if (Editor.cursorx<Editor.screenwidth-1){
                 Editor.cursorx++;
+            }else if(Editor.cursorx+Editor.coloffset<Editor.rows[Editor.rowoffset+Editor.cursory].len){
+                //if you're past the last position in the line
+                Editor.coloffset++;//scroll right
+                refreshScreen();
             }
+
             break;
         case PAGE_DOWN:
         case PAGE_UP:{
@@ -236,14 +258,21 @@ void movecursor(int key){
     }
 
 }
+
 void drawrows(struct buffer *buff){
     for (int y=0; y<Editor.screenheight; y++){//for every line in the height
         if (y<Editor.numrows){//draws lines from the file
             //need to make sure it fits the size of the line in the terminal
-            int len=Editor.rows[y].len;
+            int len=Editor.rows[Editor.rowoffset+y].len;
             if (len>Editor.screenwidth-1){len=Editor.screenwidth;}
-            bufferAppend(buff, Editor.rows[y].text,len);
-
+            bufferAppend(buff, Editor.rows[Editor.rowoffset+y].text,len);
+            /*
+            char *string=Editor.rows[Editor.rowoffset+y].text;
+            int len=Editor.rows[Editor.rowoffset+y].len;
+            if (Editor.coloffset<=len){ //we've scrolled past the point for this line...
+                bufferAppend(buff, &string[Editor.coloffset], len-Editor.coloffset);
+            }
+            */
         } else if (Editor.numrows!=0 || y != Editor.screenheight/3){//DRAWING NON-FILE LINES
             bufferAppend(buff,"\x1b[2K~",5);//clear the line (and add a tilde)
         } else {//print the welcome message
@@ -275,10 +304,10 @@ void refreshScreen(){
     bufferAppend(&buff,"\x1b[?25l",6);//hide cursor, remember bytes are by character
     bufferAppend(&buff,"\x1b[H",3 );//curor to home
     drawrows(&buff);
-    bufferAppend(&buff,"\x1b[H",3 );//back to home
     //instead of moving back home, we're going to move to the x and y
     char buf_cursorpos[32];
-    snprintf(buf_cursorpos,sizeof(buf_cursorpos),"\x1b[%d;%dH",Editor.cursory+1,Editor.cursorx+1);//the terminal is indexed from 1 for some reason...
+    snprintf(buf_cursorpos,sizeof(buf_cursorpos),"\x1b[%d;%dH",Editor.cursory+1,Editor.cursorx+1);
+    //the terminal is indexed from 1 for some reason...
     bufferAppend(&buff,buf_cursorpos,strlen(buf_cursorpos));
     bufferAppend(&buff,"\x1b[?25h",6);//show the cursor
     write(STDOUT_FILENO,buff.string,buff.len);//flush the buffer to STDOUT_FILENO
@@ -305,25 +334,12 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 /*append buffer (aka dynamic string)*/
-void bufferAppend(struct buffer *buffer, const char *string,int len ){//len here is the len of s
+void bufferAppend(struct buffer *buffer, const char *string,int len){//len here is the len of s
     char *new=realloc(buffer->string, buffer->len+len);
     if (new==NULL) return;//just error checking
     memcpy(&new[buffer->len],string, len);
     buffer->string=new;
     buffer->len+=len;
-    /*
-    NOTE:
-    realloc is a little weird. in this function, it could create a new block of memory
-    or it could just extend the current one that buffer->string points to.
-    because of this, it essentially gets rid of the original memory location that
-    buffer->string pointed to. Accessing that before the reassignment to new would
-    mean accessing memory from outside the program's perview. The memory at buffer->string
-    was deleted by realloc by then, so it's just random bits. 
-    When we use memcpy, the contents from string get copied at the location starting
-    from where the null pointer of the string we copied into new (via realloc). 
-    We then reassign this new "*new" value to our buffer->string, and blammo, 
-    our buffer->string pointer is now the *new pointer and points to the new string.
-     */
 }
 void freeBuffer(struct buffer *buffer){
     free(buffer->string);
@@ -351,7 +367,7 @@ void appendRow(char *s, ssize_t len){
     Editor.rows[at].text=malloc(len+1);
     Editor.rows[at].len=len+1;
     memcpy(Editor.rows[at].text,s, len);
-    Editor.rows[at].text[len+1]='\0';
+    Editor.rows[at].text[len]='\0';
     Editor.numrows++;
 }
 
