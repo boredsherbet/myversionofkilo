@@ -1,4 +1,9 @@
 /** includes **/
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
+#define _GNU_SOURCE
+
+#include <sys/types.h>
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
@@ -26,12 +31,18 @@ enum editorKey{
 };
 
 /* structs*/
+typedef struct erow{
+    int len;
+    char *text;
+} erow;
 struct editorConf{//it'll be easier to store global state this way instead of random vars
     struct termios og_termios;//it's really making me mad that termios doesn't have an n...
     int cursorx;
     int cursory;
     int screenwidth; 
     int screenheight;
+    int numrows;
+    erow *rows;
 };
 struct buffer{//this will be a dynamic string that we use as a buffer.
     char *string;
@@ -39,6 +50,7 @@ struct buffer{//this will be a dynamic string that we use as a buffer.
 };
 /* function prototypes */ //man i hate using C purely because of function prototypes... I planned not to use these but the dependencies are getting too confusing....
 void movecursor(int key);
+void appendRow(char *s, ssize_t len);
 void initEditor();//initializes editor object that saves stuff about terminal
 void die(const char *s);//everything went wrong, print message for info and kys (the program)
 void closeKilo();//closes everything
@@ -52,6 +64,7 @@ void refreshScreen();//working on this one
 void setFlags();//sets terminal flags to the values we need to build and run text editor
 void bufferAppend(struct buffer *buffer, const char *string,int len ); // dynamic string append
 void freeBuffer(struct buffer *buffer); //frees buffer memory
+void openEditor();//opens an editor. no file input yet, but that will probably be a parameter later
 struct editorConf Editor;
 
 void initEditor(){
@@ -60,6 +73,8 @@ void initEditor(){
     //and cursor y rows down when initialized
     Editor.cursorx=0;
     Editor.cursory=0;
+    Editor.numrows=0;
+    Editor.rows=NULL; //npd if we fork up.
 }
 void die(const char *s){
     write(STDOUT_FILENO,"\x1b[2J",4);
@@ -161,6 +176,7 @@ int getWindowSize(int *rows, int *columns){//this way we can get rows and cols t
     return 0;
     //but sometimes ioctl doesn't work (eg. with windows...)
 }
+
 void processKeys(){
     int c=readKeys();
     switch (c) {
@@ -222,7 +238,13 @@ void movecursor(int key){
 }
 void drawrows(struct buffer *buff){
     for (int y=0; y<Editor.screenheight; y++){//for every line in the height
-        if (y != Editor.screenheight/3){//when you're not a third of the way down
+        if (y<Editor.numrows){//draws lines from the file
+            //need to make sure it fits the size of the line in the terminal
+            int len=Editor.rows[y].len;
+            if (len>Editor.screenwidth-1){len=Editor.screenwidth;}
+            bufferAppend(buff, Editor.rows[y].text,len);
+
+        } else if (Editor.numrows!=0 || y != Editor.screenheight/3){//DRAWING NON-FILE LINES
             bufferAppend(buff,"\x1b[2K~",5);//clear the line (and add a tilde)
         } else {//print the welcome message
             char welcomeMessage[80];
@@ -270,9 +292,12 @@ void setFlags(){
     removeFlags(&now_termios); //change current state of terminal
 }
 /* main */
-int main() {
+int main(int argc, char *argv[]) {
     setFlags();//sets the flags of terminal settings to disable terminal defaults
     initEditor();//screen width & height saved
+    if (argc==2){
+        openEditor(argv[1]);
+    }
     while (1){
         refreshScreen();
         processKeys();
@@ -287,7 +312,7 @@ void bufferAppend(struct buffer *buffer, const char *string,int len ){//len here
     buffer->string=new;
     buffer->len+=len;
     /*
-    Notes:
+    NOTE:
     realloc is a little weird. in this function, it could create a new block of memory
     or it could just extend the current one that buffer->string points to.
     because of this, it essentially gets rid of the original memory location that
@@ -303,3 +328,30 @@ void bufferAppend(struct buffer *buffer, const char *string,int len ){//len here
 void freeBuffer(struct buffer *buffer){
     free(buffer->string);
 }
+/*** file i/o ***/
+void openEditor(char *filename){
+    FILE *fp =fopen(filename,"r");
+    if (!fp) die("open");
+    size_t linebuffsize=0;
+    char *linebuff=NULL;
+    ssize_t linelen;
+    while ((linelen=getline(&linebuff,&linebuffsize,fp))!=-1){
+        while (linelen>0 && (linebuff[linelen-1]=='\n' || linebuff[linelen-1]=='\r')){
+            //we're only doing till the newline, so ignore anything after the newline
+            linelen--;
+        }
+        appendRow(linebuff,linelen);
+    }
+    free (linebuff);
+    fclose(fp);
+}
+void appendRow(char *s, ssize_t len){
+    Editor.rows=realloc(Editor.rows, sizeof(erow) *(Editor.numrows+1));
+    int at=Editor.numrows;
+    Editor.rows[at].text=malloc(len+1);
+    Editor.rows[at].len=len+1;
+    memcpy(Editor.rows[at].text,s, len);
+    Editor.rows[at].text[len+1]='\0';
+    Editor.numrows++;
+}
+
