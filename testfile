@@ -1,122 +1,100 @@
-<!DOCTYPE html> 
-Here I'm writing a really long line of text look at the length of thils line it's so long damn well the garbage truck came can you believe that kinda shit? That's crazy damn.
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Detailed HTML Page</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f4f4;
-        }
-        header {
-            background: #333;
-            color: #fff;
-            padding: 10px 0;
-            text-align: center;
-        }
-        nav {
-            display: flex;
-            justify-content: center;
-            background: #555;
-        }
-        nav a {
-            color: white;
-            padding: 15px;
-            text-decoration: none;
-            text-transform: uppercase;
-            font-weight: bold;
-        }
-        nav a:hover {
-            background-color: #777;
-        }
-        main {
-            padding: 20px;
-            max-width: 1200px;
-            margin: 20px auto;
-            background: #fff;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        section {
-            margin-bottom: 20px;
-        }
-        section h2 {
-            color: #333;
-        }
-        .gallery {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .gallery img {
-            width: calc(33% - 20px);
-            border-radius: 5px;
-        }
-        .card {
-            background: #eee;
-            padding: 20px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            box-shadow: 0 0 5px rgba(0,0,0,0.1);
-        }
-        .card h3 {
-            margin-top: 0;
-        }
-        .card p {
-            margin-bottom: 0;
-        }
-        footer {
-            background: #333;
-            color: #fff;
-            text-align: center;
-            padding: 10px 0;
-            margin-top: 20px;
-        }
-        .cta-button {
-            display: inline-block;
-            background: #333;
-            color: #fff;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            transition: background 0.3s ease;
-        }
-        .cta-button:hover {
-            background: #555;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        .form-group input, .form-group textarea {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-    </style>
-</head>
-<body>
-    <header>
-        <h1>Welcome to My Detailed HTML Page</h1>
-    </header>
-
-    <nav>
-        <a href="#about">About</a>
-        <a href="#gallery">Gallery</a>
-        <a href="#services">Services</a>
-        <a href="#contact">Contact</a>
-    </nav>
-
-    <main>
-        <section id="about">
-            <h2>About This Page</h2>
-            <p>This page is a more detailed example of an HTML file, designed to showcase a variety of HTML elements and CSS styling techniques. It's built to be responsive and easy to customize, p
+1: This is line 1. End of line1: This is line 1. End of line.
+2: Line 2 here. End of line.
+3: The third line is slightly longer to test horizontal scrolling. End of line.
+4: Fourth line goes here. End of line.
+5: Here's line 5. It's also a bit longer to ensure horizontal scrolling is tested properly. End of line.
+6: Line 6 is this. End of line.
+7: Line number 7 is relatively short. End of line.
+8: Line 8 is here. End of line.
+9: This is line 9. End of line.
+10: Tenth line in the list. End of line.
+11: Line 11 continues here. End of line.
+12: This is line 12, which is significantly longer than the previous ones. This line will definitely require horizontal scrolling to read fully. End of line.
+13: Thirteenth line here. End of line.
+14: Line 14 is short. End of line.
+15: Here's line 15. End of line.
+16: Sweet 16th line. End of line.
+17: Line 17 in the sequence is also made longer to test the scrolling feature. Make sure to scroll to the right to see the full line. End of line.
+18: Eighteenth line. End of line.
+19: Line 19 follows. End of line.
+20: Line number 20 is a bit longer, stretching out further to the right than usual. End of line.
+21: Here's line 21. End of line.
+22: Twenty-second line. End of line.
+23: Line 23 is here. End of line.
+24: Line 24 follows. End of line.
+25: Line number 25 is made extra long. This will require horizontal scrolling for sure. It goes on and on and still continues to the right. End of line.
+26: Here's line 26. End of line.
+27: Line 27 follows. End of line.
+28: The 28th line. End of line.
+29: Line 29 continues. End of line.
+30: Thirtieth line here is fairly normal in length. End of line.
+31: Line 31 follows. End of line.
+32: Line 32 is here. End of line.
+33: Thirty-third line is another long one. Scroll horizontally to see all the text on this line. End of line.
+34: Line 34 in sequence. End of line.
+35: Line 35 goes here. End of line.
+36: Thirty-sixth line. End of line.
+37: Line 37 follows. End of line.
+38: Line number 38 is longer than usual and extends far to the right. Make sure you can scroll to see the entire line. End of line.
+39: Thirty-ninth line. End of line.
+40: Line 40 here. End of line.
+41: Line 41 continues. End of line.
+42: The 42nd line is fairly lengthy and should be visible only if you scroll horizontally. Test this feature now. End of line.
+43: Line 43 is here. End of line.
+44: Forty-fourth line. End of line.
+45: Line 45 follows. End of line.
+46: Line number 46. End of line.
+47: Line 47 is here. End of line.
+48: The 48th line. End of line.
+49: Line 49 here. End of line.
+50: Line 50 follows and is quite long. Scroll to the right to ensure you can see all the text in this line. It's important for your horizontal scrolling test. End of line.
+51: Line 51 is here. End of line.
+52: The 52nd line. End of line.
+53: Line 53 in sequence. End of line.
+54: Line 54 follows. End of line.
+55: Line 55 here. End of line.
+56: Fifty-sixth line is fairly short. End of line.
+57: Line 57 continues. End of line.
+58: Line 58 is here. End of line.
+59: Line 59 follows. End of line.
+60: Line number 60 is somewhat longer than others and will require scrolling to the right. End of line.
+61: The 61st line. End of line.
+62: Line 62 follows. End of line.
+63: Line 63 here is quite long, stretching far to the right. Test your scrolling now. End of line.
+64: Sixty-fourth line. End of line.
+65: Line 65 follows. End of line.
+66: The 66th line. End of line.
+67: Line 67 is here. End of line.
+68: Line number 68 is another long one, requiring horizontal scrolling to view in full. End of line.
+69: Sixty-ninth line. End of line.
+70: Line 70 continues. End of line.
+71: Line 71 here. End of line.
+72: Seventy-second line is made long to test the limits of horizontal scrolling. Ensure you can see it all. End of line.
+73: Line 73 follows. End of line.
+74: Line 74 is here. End of line.
+75: The 75th line. End of line.
+76: Line 76 continues. End of line.
+77: Seventy-seventh line is fairly short. End of line.
+78: Line 78 here. End of line.
+79: Line number 79 is long and should test your scrolling ability. End of line.
+80: The 80th line. End of line.
+81: Line 81 follows. End of line.
+82: Eighty-second line is long and goes on to the right. Make sure you can scroll to see it all. End of line.
+83: Line 83 is here. End of line.
+84: Line 84 follows. End of line.
+85: Eighty-fifth line is fairly short. End of line.
+86: Line 86 is here. End of line.
+87: Line number 87. End of line.
+88: The 88th line is fairly lengthy, stretching far to the right for your scrolling test. End of line.
+89: Line 89 continues. End of line.
+90: Ninetieth line. End of line.
+91: Line 91 follows and is made longer to test scrolling. End of line.
+92: Ninety-second line. End of line.
+93: Line 93 is here. End of line.
+94: Line 94 follows. End of line.
+95: Ninety-fifth line is fairly short. End of line.
+96: Line 96 continues. End of line.
+97: Line 97 here. End of line.
+98: The 98th line is long enough to require scrolling. End of line.
+99: Line 99 follows. End of line.
+100: Line 100 ends here with a long sentence that stretches out far to the right, ensuring you have to scroll horizontally to see the entire line. End of line.

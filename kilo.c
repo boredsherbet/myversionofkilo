@@ -37,16 +37,23 @@ typedef struct erow{
 } erow;
 struct editorConf{//it'll be easier to store global state this way instead of random vars
     struct termios og_termios;//it's really making me mad that termios doesn't have an n...
-    int cursorx;//columnal position of cursor in editor
-    int cursory;//row position of cursor in editor
-    //NOTE: cursor position in a file requires use of rowoffset or columnoffset.
+    int cursorx;//position of curor in file
+    int cursory;//position of curor in file
+    // NOTE: cursor position in a file requires use of rowoffset or columnoffset.
     // the cursorx and cursory variables are the position in the editor's window pane
+    // the goal now is to make it that the offset deterines the window's coordinates (top, left)
+    // and then the cursorx and cursory deterine the cursor's position in the file
+    // then we can use the cursor's position to enter in stuff to the file.
+    //
     int screenwidth;//tracks the number of columns/width of the editor
     int screenheight;//tracks the height of the editor
     int numrows;//tracks the number of rows in the text
     int rowoffset;//used for vertical scrolling purposes
     int coloffset;//used for horizontal scrolling purposes
     erow *rows; //stores all the rows on the editor.
+    //NOTE: for the position of the cursor in the editor
+    //x=cursorx-coloffset
+    //y=cursory-rowoffset
 };
 struct buffer{//this will be a dynamic string that we use as a buffer.
     char *string;
@@ -63,7 +70,7 @@ int getCursorPos(int *rows, int *columns);//gets the position of the cursor
 int readKeys();//reads the key presses
 int getWindowSize(int *rows, int *columns);//gets the size of the window
 void processKeys();//processes key presses (and calls readkeys to read them)
-void drawRows();//draws the tildes, for now
+void drawrows(struct buffer *buff);//draws the tildes, for now
 void refreshScreen();//working on this one
 void setFlags();//sets terminal flags to the values we need to build and run text editor
 void bufferAppend(struct buffer *buffer, const char *string,int len ); // dynamic string append
@@ -184,6 +191,23 @@ int getWindowSize(int *rows, int *columns){//this way we can get rows and cols t
     //but sometimes ioctl doesn't work (eg. with windows...)
 }
 
+void editorscroll(){
+    // TODO:utilizing the editor config, scroll the editor to place the cursor as necessary.
+    // if it goes off in the y, adjus tthe rowoffset
+    // if it goes off in the x, adjust the colofset as necessary.
+    if (Editor.cursory<Editor.rowoffset){//the cursor is above the window
+        Editor.rowoffset=Editor.cursory;
+    } else if (Editor.cursory>Editor.rowoffset+Editor.screenheight-1){//y cursor below window
+        Editor.rowoffset=Editor.cursory-Editor.screenheight;
+    }
+    if (Editor.coloffset<Editor.cursorx){//x cursor left of window
+        Editor.coloffset=Editor.cursorx;
+    }
+    if (Editor.cursorx>Editor.coloffset+Editor.screenwidth-1){//x cursor right of window
+        Editor.coloffset=Editor.cursorx-Editor.screenwidth;
+    }
+}
+
 void processKeys(){
     int c=readKeys();
     switch (c) {
@@ -209,37 +233,22 @@ void movecursor(int key){
         case ARROW_LEFT://cursor left
             if (Editor.cursorx!=0){
                 Editor.cursorx--;//move left
-            } else if(Editor.cursorx+Editor.coloffset!=0){
-                Editor.coloffset--;//scroll left
-                refreshScreen();
             }
             break;
         case ARROW_UP://cursor up
             if (Editor.cursory!=0){ 
                 Editor.cursory--;//move up
-            } else if(Editor.rowoffset!=0){
-                Editor.rowoffset--;//scroll up
-                refreshScreen();
             }
             break;
         case ARROW_DOWN: 
-            if (Editor.cursory<Editor.screenheight-1){
+            if (Editor.cursory<Editor.numrows){//cursory is 0 indexed, but screenheight is 1 indexed
                 Editor.cursory++;//move down
-            } else if(Editor.rowoffset+Editor.cursory<Editor.numrows){
-                //position of cursor in file is offset+pos in editor
-                Editor.rowoffset++;//scroll down
-                refreshScreen();
             }
             break;
         case ARROW_RIGHT:
-            if (Editor.cursorx<Editor.screenwidth-1){
+            if (Editor.cursorx<Editor.rows[Editor.cursory].len-1){
                 Editor.cursorx++;
-            }else if(Editor.cursorx+Editor.coloffset<Editor.rows[Editor.rowoffset+Editor.cursory].len){
-                //if you're past the last position in the line
-                Editor.coloffset++;//scroll right
-                refreshScreen();
             }
-
             break;
         case PAGE_DOWN:
         case PAGE_UP:{
@@ -253,32 +262,37 @@ void movecursor(int key){
             Editor.cursorx=0;
             break;
         case END_KEY:
-            Editor.cursorx=Editor.screenwidth-1;
+            Editor.cursorx=Editor.rows[Editor.cursory].len-1;
             break;
     }
-
+    editorscroll();
 }
 
 void drawrows(struct buffer *buff){
     for (int y=0; y<Editor.screenheight; y++){//for every line in the height
-        if (y<Editor.numrows){//draws lines from the file
+        //we need to start at rowoffset, so...
+        int linenumber=y+Editor.rowoffset;
+        if (y==5){//FOR DEBUGGING PURPOSES.
+            char debugLine[100];//for the debugging line
+            int debuglen=snprintf(debugLine,sizeof(debugLine),"Editor at %d,%d. Pointer at %d,%d. Screen of %d,%d. %d rows in file.",Editor.coloffset,Editor.rowoffset,Editor.cursorx,Editor.cursory,Editor.screenwidth,Editor.screenheight,Editor.numrows);
+            bufferAppend(buff, debugLine, debuglen);
+        } else if (linenumber<Editor.numrows){//draws lines from the file
             //need to make sure it fits the size of the line in the terminal
-            int len=Editor.rows[Editor.rowoffset+y].len;
-            if (len>Editor.screenwidth-1){len=Editor.screenwidth;}
-            bufferAppend(buff, Editor.rows[Editor.rowoffset+y].text,len);
-            /*
-            char *string=Editor.rows[Editor.rowoffset+y].text;
-            int len=Editor.rows[Editor.rowoffset+y].len;
-            if (Editor.coloffset<=len){ //we've scrolled past the point for this line...
-                bufferAppend(buff, &string[Editor.coloffset], len-Editor.coloffset);
+            int len=Editor.rows[linenumber].len;
+            len=len-Editor.coloffset;//our length decreases by however much our column offset is
+            if (len>Editor.screenwidth-1){len=Editor.screenwidth;}//and truncate to fit screen
+            if (len>0){
+                //start printing from the coloffset point...
+                bufferAppend(buff, &Editor.rows[linenumber].text[Editor.coloffset],len);
             }
-            */
-        } else if (Editor.numrows!=0 || y != Editor.screenheight/3){//DRAWING NON-FILE LINES
+        } else if (Editor.numrows!=0){//lines after file's completion
+            bufferAppend(buff,"\x1b[2K~",5);//clear the line (and add a tilde)
+        } else if (y != Editor.screenheight/3){//Editor.numrows==0
             bufferAppend(buff,"\x1b[2K~",5);//clear the line (and add a tilde)
         } else {//print the welcome message
             char welcomeMessage[80];
             int welcomelen=snprintf(welcomeMessage,sizeof(welcomeMessage),"Welcome to Kilo v.%s",VERSION);
-            if (welcomelen>Editor.screenwidth){welcomelen=Editor.screenwidth;}//snprintf will prolly return 80 (but we can't be sure)
+            if (welcomelen>Editor.screenwidth){welcomelen=Editor.screenwidth;}//screen too small, truncate
             else {
                 int padding=(Editor.screenwidth-welcomelen)/2;
                 if (padding){ //if there is padding (aka padding!=0)
@@ -295,12 +309,13 @@ void drawrows(struct buffer *buff){
             bufferAppend(buff, welcomeMessage,welcomelen);
         }
         if (y!=Editor.screenheight-1){//no extra newline at the end of the terminal
-            bufferAppend(buff,"\r\n",2);
+            bufferAppend(buff,"\r\n",2);//move cursor to next line
         }
     }
 }
 void refreshScreen(){
     struct buffer buff = BUFFER_INIT;//dynamic string for buffer
+    bufferAppend(&buff, "\x1b[2J", 4);//clear the screen
     bufferAppend(&buff,"\x1b[?25l",6);//hide cursor, remember bytes are by character
     bufferAppend(&buff,"\x1b[H",3 );//curor to home
     drawrows(&buff);
