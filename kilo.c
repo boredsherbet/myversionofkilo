@@ -39,12 +39,6 @@ struct editorConf{//it'll be easier to store global state this way instead of ra
     struct termios og_termios;//it's really making me mad that termios doesn't have an n...
     int cursorx;//position of curor in file
     int cursory;//position of curor in file
-    // NOTE: cursor position in a file requires use of rowoffset or columnoffset.
-    // the cursorx and cursory variables are the position in the editor's window pane
-    // the goal now is to make it that the offset deterines the window's coordinates (top, left)
-    // and then the cursorx and cursory deterine the cursor's position in the file
-    // then we can use the cursor's position to enter in stuff to the file.
-    //
     int screenwidth;//tracks the number of columns/width of the editor
     int screenheight;//tracks the height of the editor
     int numrows;//tracks the number of rows in the text
@@ -52,8 +46,8 @@ struct editorConf{//it'll be easier to store global state this way instead of ra
     int coloffset;//used for horizontal scrolling purposes
     erow *rows; //stores all the rows on the editor.
     //NOTE: for the position of the cursor in the editor
-    //x=cursorx-coloffset
-    //y=cursory-rowoffset
+    //x=cursorx-coloffset+1
+    //y=cursory-rowoffset+1 
 };
 struct buffer{//this will be a dynamic string that we use as a buffer.
     char *string;
@@ -197,14 +191,17 @@ void editorscroll(){
     // if it goes off in the x, adjust the colofset as necessary.
     if (Editor.cursory<Editor.rowoffset){//the cursor is above the window
         Editor.rowoffset=Editor.cursory;
+        editorscroll();
     } else if (Editor.cursory>Editor.rowoffset+Editor.screenheight-1){//y cursor below window
         Editor.rowoffset=Editor.cursory-Editor.screenheight+1;
+        editorscroll();
     }
-    if (Editor.coloffset<Editor.cursorx){//x cursor left of window
+    if (Editor.cursorx<Editor.coloffset){//x cursor left of window
         Editor.coloffset=Editor.cursorx;
-    }
-    if (Editor.cursorx>Editor.coloffset+Editor.screenwidth-1){//x cursor right of window
-        Editor.coloffset=Editor.cursorx-Editor.screenwidth;
+        editorscroll();
+    } else if (Editor.cursorx>Editor.coloffset+Editor.screenwidth-1){//x cursor right of window
+        Editor.coloffset=Editor.cursorx-Editor.screenwidth+1;
+        editorscroll();
     }
 }
 
