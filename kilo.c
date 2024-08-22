@@ -198,7 +198,7 @@ void editorscroll(){
     if (Editor.cursory<Editor.rowoffset){//the cursor is above the window
         Editor.rowoffset=Editor.cursory;
     } else if (Editor.cursory>Editor.rowoffset+Editor.screenheight-1){//y cursor below window
-        Editor.rowoffset=Editor.cursory-Editor.screenheight;
+        Editor.rowoffset=Editor.cursory-Editor.screenheight+1;
     }
     if (Editor.coloffset<Editor.cursorx){//x cursor left of window
         Editor.coloffset=Editor.cursorx;
@@ -321,7 +321,9 @@ void refreshScreen(){
     drawrows(&buff);
     //instead of moving back home, we're going to move to the x and y
     char buf_cursorpos[32];
-    snprintf(buf_cursorpos,sizeof(buf_cursorpos),"\x1b[%d;%dH",Editor.cursory+1,Editor.cursorx+1);
+    int EditorCursorPosy = Editor.cursory-Editor.rowoffset+1;
+    int EditorCursorPosx = Editor.cursorx-Editor.coloffset+1;
+    snprintf(buf_cursorpos,sizeof(buf_cursorpos),"\x1b[%d;%dH",EditorCursorPosy,EditorCursorPosx);
     //the terminal is indexed from 1 for some reason...
     bufferAppend(&buff,buf_cursorpos,strlen(buf_cursorpos));
     bufferAppend(&buff,"\x1b[?25h",6);//show the cursor
