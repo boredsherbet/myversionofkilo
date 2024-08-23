@@ -289,7 +289,7 @@ void movecursor(int key){
         case ARROW_RIGHT:
             if (Editor.cursorx<Editor.rows[Editor.cursory].len-1){
                 Editor.cursorx++;
-            } else if (Editor.cursory<Editor.numrows){
+            } else if (Editor.cursory<Editor.numrows-1){
                 Editor.cursorx=0;
                 Editor.cursory+=1;
             }
