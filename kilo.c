@@ -17,6 +17,7 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define BUFFER_INIT {NULL,0}
 #define VERSION "0.0.1"
+#define TAB_STOP 8
 /* Editor keys enum */
 enum editorKey{
     ARROW_LEFT = 1000,
@@ -34,6 +35,8 @@ enum editorKey{
 typedef struct erow{
     int len;
     char *text;
+    char *render;
+    int rlen;
 } erow;
 struct editorConf{//it'll be easier to store global state this way instead of random vars
     struct termios og_termios;//it's really making me mad that termios doesn't have an n...
@@ -45,6 +48,8 @@ struct editorConf{//it'll be easier to store global state this way instead of ra
     int rowoffset;//used for vertical scrolling purposes
     int coloffset;//used for horizontal scrolling purposes
     erow *rows; //stores all the rows on the editor.
+    int renderx;//stores the cursor's position in the render's line (diverts from cursorx because of tabs)
+    int debug_mode;//displays the debug line in refreshscreen()
     //NOTE: for the position of the cursor in the editor
     //x=cursorx-coloffset+1
     //y=cursory-rowoffset+1 
@@ -54,7 +59,9 @@ struct buffer{//this will be a dynamic string that we use as a buffer.
     int len;
 };
 /* function prototypes */ //man i hate using C purely because of function prototypes... I planned not to use these but the dependencies are getting too confusing....
+int CursortoRender(int cursorx);
 void movecursor(int key);
+void updateRow(erow *row);
 void appendRow(char *s, ssize_t len);
 void initEditor();//initializes editor object that saves stuff about terminal
 void die(const char *s);//everything went wrong, print message for info and kys (the program)
@@ -82,6 +89,8 @@ void initEditor(){
     Editor.numrows=0;
     Editor.rowoffset=0;
     Editor.coloffset=0;
+    Editor.debug_mode=0;//automatically not in debug mode
+    Editor.renderx=0;
     Editor.rows=NULL; //npd if we fork up.
 }
 void die(const char *s){
@@ -185,10 +194,24 @@ int getWindowSize(int *rows, int *columns){//this way we can get rows and cols t
     //but sometimes ioctl doesn't work (eg. with windows...)
 }
 
+int CursortoRender(int cursorx){
+    int renderx=0;
+    for (int i=0; i<cursorx; i++){
+        char current = Editor.rows[Editor.cursory].text[i];
+        switch(current){
+            case '\t':
+                renderx+=(TAB_STOP-1)-(renderx%TAB_STOP);
+                break;
+        }
+        renderx++;//either way, we'll go one index forward
+    }
+    return renderx;
+}
 void editorscroll(){
-    // TODO:utilizing the editor config, scroll the editor to place the cursor as necessary.
-    // if it goes off in the y, adjus tthe rowoffset
-    // if it goes off in the x, adjust the colofset as necessary.
+    Editor.renderx=0;
+    if (Editor.cursory<Editor.numrows){
+        Editor.renderx=CursortoRender(Editor.cursorx);
+    }
     if (Editor.cursory<Editor.rowoffset){//the cursor is above the window
         Editor.rowoffset=Editor.cursory;
         editorscroll();
@@ -196,15 +219,15 @@ void editorscroll(){
         Editor.rowoffset=Editor.cursory-Editor.screenheight+1;
         editorscroll();
     }
-    if (Editor.cursorx<Editor.coloffset){//x cursor left of window
-        Editor.coloffset=Editor.cursorx;
+    if (Editor.renderx<Editor.coloffset){//x cursor left of window
+        Editor.coloffset=Editor.renderx;
         editorscroll();
-    } else if (Editor.cursorx>Editor.coloffset+Editor.screenwidth-1){//x cursor right of window
-        Editor.coloffset=Editor.cursorx-Editor.screenwidth+1;
+    } else if (Editor.renderx>Editor.coloffset+Editor.screenwidth-1){//x cursor right of window
+        Editor.coloffset=Editor.renderx-Editor.screenwidth+1;
         editorscroll();
     }
-    if (Editor.cursorx>Editor.rows[Editor.cursory].len){
-        Editor.cursorx=Editor.rows[Editor.cursory].len;
+    if (Editor.renderx>Editor.rows[Editor.cursory].len){
+        Editor.renderx=Editor.rows[Editor.cursory].len;
         editorscroll();
     }
 }
@@ -212,10 +235,13 @@ void editorscroll(){
 void processKeys(){
     int c=readKeys();
     switch (c) {
-        case CTRL_KEY('q'): 
+        case CTRL_KEY('q')://exit the editor
             write(STDOUT_FILENO,"\x1b[2J",4);
             write(STDOUT_FILENO,"\x1b[H",3);
             exit(0);
+            break;
+        case CTRL_KEY('a'): //turn on/off debug line
+            Editor.debug_mode= !Editor.debug_mode;
             break;
         case ARROW_UP:
         case ARROW_DOWN:
@@ -234,6 +260,9 @@ void movecursor(int key){
         case ARROW_LEFT://cursor left
             if (Editor.cursorx!=0){
                 Editor.cursorx--;//move left
+            } else if (Editor.cursory!=0){
+                Editor.cursory--;
+                Editor.cursorx=Editor.rows[Editor.cursory].len;
             }
             break;
         case ARROW_UP://cursor up
@@ -249,7 +278,7 @@ void movecursor(int key){
         case ARROW_RIGHT:
             if (Editor.cursorx<Editor.rows[Editor.cursory].len-1){
                 Editor.cursorx++;
-            } else {
+            } else if (Editor.cursory<Editor.numrows){
                 Editor.cursorx=0;
                 Editor.cursory+=1;
             }
@@ -276,18 +305,18 @@ void drawrows(struct buffer *buff){
     for (int y=0; y<Editor.screenheight; y++){//for every line in the height
         //we need to start at rowoffset, so...
         int linenumber=y+Editor.rowoffset;
-        if (y==5){//FOR DEBUGGING PURPOSES.
+        if (Editor.debug_mode && y==5){//FOR DEBUGGING PURPOSES, and since I'm dumb.
             char debugLine[100];//for the debugging line
             int debuglen=snprintf(debugLine,sizeof(debugLine),"Editor at %d,%d. Pointer at %d,%d. Screen of %d,%d. %d rows in file.",Editor.coloffset,Editor.rowoffset,Editor.cursorx,Editor.cursory,Editor.screenwidth,Editor.screenheight,Editor.numrows);
             bufferAppend(buff, debugLine, debuglen);
         } else if (linenumber<Editor.numrows){//draws lines from the file
             //need to make sure it fits the size of the line in the terminal
-            int len=Editor.rows[linenumber].len;
-            len=len-Editor.coloffset;//our length decreases by however much our column offset is
+            int len=Editor.rows[linenumber].rlen;
+            len-=Editor.coloffset;//our length decreases by however much our column offset is
             if (len>Editor.screenwidth-1){len=Editor.screenwidth;}//and truncate to fit screen
-            if (len>0){
+            if (len>0){//is there anything left to be printed?
                 //start printing from the coloffset point...
-                bufferAppend(buff, &Editor.rows[linenumber].text[Editor.coloffset],len);
+                bufferAppend(buff, &Editor.rows[linenumber].render[Editor.coloffset],len);
             }
         } else if (Editor.numrows!=0){//lines after file's completion
             bufferAppend(buff,"\x1b[2K~",5);//clear the line (and add a tilde)
@@ -326,7 +355,7 @@ void refreshScreen(){
     //instead of moving back home, we're going to move to the x and y
     char buf_cursorpos[32];
     int EditorCursorPosy = Editor.cursory-Editor.rowoffset+1;
-    int EditorCursorPosx = Editor.cursorx-Editor.coloffset+1;
+    int EditorCursorPosx = Editor.renderx-Editor.coloffset+1;
     snprintf(buf_cursorpos,sizeof(buf_cursorpos),"\x1b[%d;%dH",EditorCursorPosy,EditorCursorPosx);
     //the terminal is indexed from 1 for some reason...
     bufferAppend(&buff,buf_cursorpos,strlen(buf_cursorpos));
@@ -382,6 +411,40 @@ void openEditor(char *filename){
     free (linebuff);
     fclose(fp);
 }
+void updateRow(erow *row){
+    int text_index;
+    int tabs=0;
+    for(text_index=0;text_index<row->len; text_index++){
+        //here we'll define the amount of memory extensions we need to make
+        char current = row->text[text_index];
+        switch(current){
+            case '\t':
+                tabs++;
+                break;
+        }
+    }
+    free(row->render);//no buffer issues
+    row->render=malloc(row->len+tabs*(TAB_STOP-1)+1);
+    int render_index = 0;
+    for (text_index=0; text_index<row->len; text_index++){
+        //not using memcpy because different characters render diferently. 
+        switch(row->text[text_index]){
+            case '\t':
+                row->render[render_index++] = ' ';
+                while (render_index%TAB_STOP!=0) row->render[render_index++] = ' ';
+                //NOTE: Apparently doing this with a for loop might result in misaligned tabs
+                //this just allows for the easier creation of tables, for example and really
+                //standardizes spacing tbh. I just thought a for loop to do it 8 times would be good
+                //but then that happened so... we've come to this.
+                break;
+            default:
+                row->render[render_index++]=row->text[text_index];
+                break;
+        }
+    }
+    row->render[render_index++]='\0';
+    row->rlen=render_index;
+}
 void appendRow(char *s, ssize_t len){
     Editor.rows=realloc(Editor.rows, sizeof(erow) *(Editor.numrows+1));
     int at=Editor.numrows;
@@ -389,6 +452,8 @@ void appendRow(char *s, ssize_t len){
     Editor.rows[at].len=len+1;
     memcpy(Editor.rows[at].text,s, len);
     Editor.rows[at].text[len]='\0';
+    Editor.rows[at].rlen=0;
+    Editor.rows[at].render=NULL;
+    updateRow(&Editor.rows[at]);//this will give us rendering info for each row of the file.
     Editor.numrows++;
 }
-

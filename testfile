@@ -1,12 +1,12 @@
 1: This is line 1. End of line1: This is line 1. End of line.
-2: Line 2 here. End of line.
+2: Line 2 here, and there's a tab:	 End of line.
 3: The third line is slightly longer to test horizontal scrolling. End of line.
-4: Fourth line goes here. End of line.
+4: Fourth line goes here. couple of tabs: 		End of line.
 5: Here's line 5. It's also a bit longer to ensure horizontal scrolling is tested properly. End of line.
 6: Line 6 is this. End of line.
 7: Line number 7 is relatively short. End of line.
 8: Line 8 is here. End of line.
-9: This is line 9. End of line.
+9: This is line 9, it also has a 	hehe did u see that tab... End of line.
 10: Tenth line in the list. End of line.
 11: Line 11 continues here. End of line.
 12: This is line 12, which is significantly longer than the previous ones. This line will definitely require horizontal scrolling to read fully. End of line.
