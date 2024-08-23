@@ -208,10 +208,13 @@ int CursortoRender(int cursorx){
     return renderx;
 }
 void editorscroll(){
-    Editor.renderx=0;
-    if (Editor.cursory<Editor.numrows){
-        Editor.renderx=CursortoRender(Editor.cursorx);
-    }
+    Editor.renderx=CursortoRender(Editor.cursorx);
+    //NOTE: the bug is here. I'm trying to access a non-allocated cursor x, 
+    //and im getting a bufferoverflow. since my cursor x value is too high
+    //going up or too high going down. it seems I need to pass in a value 
+    //that is definitively in the file. I'll do that by just editing it 
+    //in the movecursor(). Like I did for the horizontal movement skipping 
+    //to the next line.
     if (Editor.cursory<Editor.rowoffset){//the cursor is above the window
         Editor.rowoffset=Editor.cursory;
         editorscroll();
@@ -226,8 +229,8 @@ void editorscroll(){
         Editor.coloffset=Editor.renderx-Editor.screenwidth+1;
         editorscroll();
     }
-    if (Editor.renderx>Editor.rows[Editor.cursory].len){
-        Editor.renderx=Editor.rows[Editor.cursory].len;
+    if (Editor.renderx>Editor.rows[Editor.cursory].rlen-1){//x cursor too far right, outside file
+        Editor.renderx=Editor.rows[Editor.cursory].rlen-1;
         editorscroll();
     }
 }
@@ -265,14 +268,22 @@ void movecursor(int key){
                 Editor.cursorx=Editor.rows[Editor.cursory].len;
             }
             break;
+
         case ARROW_UP://cursor up
             if (Editor.cursory!=0){ 
                 Editor.cursory--;//move up
+                if (Editor.cursorx>=Editor.rows[Editor.cursory].len){
+                    Editor.cursorx=Editor.rows[Editor.cursory].len-1;
+                }
             }
+
             break;
         case ARROW_DOWN: 
-            if (Editor.cursory<Editor.numrows){//cursory is 0 indexed, but screenheight is 1 indexed
+            if (Editor.cursory<Editor.numrows-1){//cursory is 0 indexed, but screenheight is 1 indexed
                 Editor.cursory++;//move down
+                if (Editor.cursorx>=Editor.rows[Editor.cursory].len){
+                    Editor.cursorx=Editor.rows[Editor.cursory].len-1;
+                }
             }
             break;
         case ARROW_RIGHT:
@@ -285,6 +296,14 @@ void movecursor(int key){
             break;
         case PAGE_DOWN:
         case PAGE_UP:{
+            if (key==PAGE_DOWN){
+                Editor.cursory=Editor.rowoffset+Editor.screenheight-1;
+                if (Editor.cursory>=Editor.numrows) {
+                    Editor.cursory=Editor.numrows-1;
+                }
+            } else if (key==PAGE_UP){
+                Editor.cursory=Editor.rowoffset;
+            }
             int times = Editor.screenheight;
             while (times--){
                 movecursor(key==PAGE_UP?ARROW_UP:ARROW_DOWN);
@@ -307,7 +326,7 @@ void drawrows(struct buffer *buff){
         int linenumber=y+Editor.rowoffset;
         if (Editor.debug_mode && y==5){//FOR DEBUGGING PURPOSES, and since I'm dumb.
             char debugLine[100];//for the debugging line
-            int debuglen=snprintf(debugLine,sizeof(debugLine),"Editor at %d,%d. Pointer at %d,%d. Screen of %d,%d. %d rows in file.",Editor.coloffset,Editor.rowoffset,Editor.cursorx,Editor.cursory,Editor.screenwidth,Editor.screenheight,Editor.numrows);
+            int debuglen=snprintf(debugLine,sizeof(debugLine),"Editor at %d,%d. Pointer at %d,%d, rendering %d th character. Screen of %d,%d. %d rows in file.",Editor.coloffset,Editor.rowoffset,Editor.cursorx,Editor.cursory,Editor.renderx,Editor.screenwidth,Editor.screenheight,Editor.numrows);
             bufferAppend(buff, debugLine, debuglen);
         } else if (linenumber<Editor.numrows){//draws lines from the file
             //need to make sure it fits the size of the line in the terminal
@@ -333,7 +352,7 @@ void drawrows(struct buffer *buff){
                     padding--;
                 }
                 while (padding--){ //and fill out the rest of the padding
-                    //note: you can use while(increment--) to decrement to 0 from increment
+                    //NOTE: you can use while(increment--) to decrement to 0 from increment
                     //this is only possible when increment>0, which is guaranteed here
                     //since we checked that Editor.screenwidth<=welcomelen before we entered this block
                     bufferAppend(buff," ",1);
