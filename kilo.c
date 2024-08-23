@@ -203,6 +203,10 @@ void editorscroll(){
         Editor.coloffset=Editor.cursorx-Editor.screenwidth+1;
         editorscroll();
     }
+    if (Editor.cursorx>Editor.rows[Editor.cursory].len){
+        Editor.cursorx=Editor.rows[Editor.cursory].len;
+        editorscroll();
+    }
 }
 
 void processKeys(){
@@ -245,6 +249,9 @@ void movecursor(int key){
         case ARROW_RIGHT:
             if (Editor.cursorx<Editor.rows[Editor.cursory].len-1){
                 Editor.cursorx++;
+            } else {
+                Editor.cursorx=0;
+                Editor.cursory+=1;
             }
             break;
         case PAGE_DOWN:
