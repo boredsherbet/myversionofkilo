@@ -50,6 +50,7 @@ struct editorConf{//it'll be easier to store global state this way instead of ra
     erow *rows; //stores all the rows on the editor.
     int renderx;//stores the cursor's position in the render's line (diverts from cursorx because of tabs)
     int debug_mode;//displays the debug line in refreshscreen()
+    char *filename;//saves the name of the file being displayed.
     //NOTE: for the position of the cursor in the editor
     //x=cursorx-coloffset+1
     //y=cursory-rowoffset+1 
@@ -59,9 +60,11 @@ struct buffer{//this will be a dynamic string that we use as a buffer.
     int len;
 };
 /* function prototypes */ //man i hate using C purely because of function prototypes... I planned not to use these but the dependencies are getting too confusing....
+void drawDebugBar(struct buffer *buff);
 int CursortoRender(int cursorx);
 void movecursor(int key);
 void updateRow(erow *row);
+void drawStatusBar(struct buffer *buff);
 void appendRow(char *s, ssize_t len);
 void initEditor();//initializes editor object that saves stuff about terminal
 void die(const char *s);//everything went wrong, print message for info and kys (the program)
@@ -92,6 +95,8 @@ void initEditor(){
     Editor.debug_mode=0;//automatically not in debug mode
     Editor.renderx=0;
     Editor.rows=NULL; //npd if we fork up.
+    Editor.screenheight-=1;//adding a status bar at bottom, we'll put the debug here later too...
+    Editor.filename=NULL;//filled in when editor is opened.
 }
 void die(const char *s){
     write(STDOUT_FILENO,"\x1b[2J",4);
@@ -324,11 +329,7 @@ void drawrows(struct buffer *buff){
     for (int y=0; y<Editor.screenheight; y++){//for every line in the height
         //we need to start at rowoffset, so...
         int linenumber=y+Editor.rowoffset;
-        if (Editor.debug_mode && y==5){//FOR DEBUGGING PURPOSES, and since I'm dumb.
-            char debugLine[100];//for the debugging line
-            int debuglen=snprintf(debugLine,sizeof(debugLine),"Editor at %d,%d. Pointer at %d,%d, rendering %d th character. Screen of %d,%d. %d rows in file.",Editor.coloffset,Editor.rowoffset,Editor.cursorx,Editor.cursory,Editor.renderx,Editor.screenwidth,Editor.screenheight,Editor.numrows);
-            bufferAppend(buff, debugLine, debuglen);
-        } else if (linenumber<Editor.numrows){//draws lines from the file
+        if (linenumber<Editor.numrows){//draws lines from the file
             //need to make sure it fits the size of the line in the terminal
             int len=Editor.rows[linenumber].rlen;
             len-=Editor.coloffset;//our length decreases by however much our column offset is
@@ -360,10 +361,42 @@ void drawrows(struct buffer *buff){
             }
             bufferAppend(buff, welcomeMessage,welcomelen);
         }
-        if (y!=Editor.screenheight-1){//no extra newline at the end of the terminal
-            bufferAppend(buff,"\r\n",2);//move cursor to next line
-        }
+        bufferAppend(buff,"\r\n",2);//move cursor to next line
     }
+}
+void drawStatusBar(struct buffer *buff){
+    bufferAppend(buff, "\x1b[7m", 4 );//switch to inverted
+    char statusbar[80], rstatus[80];
+    int rlen=snprintf(rstatus, sizeof(rstatus), "%d",Editor.cursory+Editor.rowoffset);
+    int len; 
+    if (Editor.filename){
+        len=snprintf(statusbar, sizeof(statusbar), "%.20s - %d lines",Editor.filename, Editor.numrows);
+    } else{
+        len=snprintf(statusbar,sizeof(statusbar),"[No Name] - %d lines", Editor.numrows);
+    }
+    if (len>Editor.screenwidth) len= Editor.screenwidth;
+    bufferAppend(buff, statusbar, len);
+    while (len<Editor.screenwidth){
+        bufferAppend(buff, " ", 1);
+        len++;
+    }
+    bufferAppend(buff, "\x1b[m", 3 );//switch to normal
+}
+void drawDebugBar(struct buffer *buff){
+    bufferAppend(buff, "\x1b[7m", 4 );//switch to inverted
+    char debugLine[Editor.screenwidth-1];//for the debugging line
+    int debuglen=0;
+    debuglen=snprintf(debugLine, sizeof(debugLine)-debuglen,"Editor: %d,%d. ", Editor.rowoffset, Editor.coloffset);
+    debuglen+=snprintf(debugLine+debuglen, sizeof(debugLine)-debuglen, "Pointer: %d, %d rendering %d. ", Editor.cursorx, Editor.cursory, Editor.renderx);
+    debuglen+=snprintf(debugLine+debuglen,sizeof(debugLine)-debuglen, "Screen of %d, %d. ", Editor.screenwidth,Editor.screenheight);
+    debuglen+=snprintf(debugLine+debuglen, sizeof(debugLine)-debuglen, "%d rows", Editor.numrows);
+    if (debuglen>Editor.screenwidth) debuglen=Editor.screenwidth;
+    bufferAppend(buff, debugLine, debuglen);
+    while (debuglen<Editor.screenwidth){
+        bufferAppend(buff, " ", 1);
+        debuglen++;
+    }
+    bufferAppend(buff, "\x1b[m", 3 );//switch to normal
 }
 void refreshScreen(){
     struct buffer buff = BUFFER_INIT;//dynamic string for buffer
@@ -371,6 +404,11 @@ void refreshScreen(){
     bufferAppend(&buff,"\x1b[?25l",6);//hide cursor, remember bytes are by character
     bufferAppend(&buff,"\x1b[H",3 );//curor to home
     drawrows(&buff);
+    if (Editor.debug_mode) {
+        drawDebugBar(&buff);
+    } else {
+        drawStatusBar(&buff);
+    }
     //instead of moving back home, we're going to move to the x and y
     char buf_cursorpos[32];
     int EditorCursorPosy = Editor.cursory-Editor.rowoffset+1;
@@ -415,6 +453,8 @@ void freeBuffer(struct buffer *buffer){
 }
 /*** file i/o ***/
 void openEditor(char *filename){
+    free(Editor.filename);//the memory for that null pointer is still allocated yk...
+    Editor.filename=strdup(filename);
     FILE *fp =fopen(filename,"r");
     if (!fp) die("open");
     size_t linebuffsize=0;
