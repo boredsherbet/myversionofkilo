@@ -213,14 +213,16 @@ int CursortoRender(int cursorx){
     return renderx;
 }
 void editorscroll(){
+    //NOTE: Cursor positions should be in the file when they enter this
+    //function. If the cursor positions passed here are out of the file, it's over.
+    if(Editor.cursory>Editor.numrows || Editor.cursory<0){
+        die("cursor's y position out of bounds.");
+    }
+    if(Editor.cursorx>Editor.rows[Editor.cursory].len || Editor.cursorx<0){
+        die("cursor's x position out of bounds.");
+    }
     Editor.renderx=CursortoRender(Editor.cursorx);
-    //NOTE: the bug is here. I'm trying to access a non-allocated cursor x, 
-    //and im getting a bufferoverflow. since my cursor x value is too high
-    //going up or too high going down. it seems I need to pass in a value 
-    //that is definitively in the file. I'll do that by just editing it 
-    //in the movecursor(). Like I did for the horizontal movement skipping 
-    //to the next line.
-    if (Editor.cursory<Editor.rowoffset){//the cursor is above the window
+    if (Editor.cursory<Editor.rowoffset){
         Editor.rowoffset=Editor.cursory;
         editorscroll();
     } else if (Editor.cursory>Editor.rowoffset+Editor.screenheight-1){//y cursor below window
@@ -299,19 +301,27 @@ void movecursor(int key){
                 Editor.cursory+=1;
             }
             break;
-        case PAGE_DOWN:
-        case PAGE_UP:{
-            if (key==PAGE_DOWN){
-                Editor.cursory=Editor.rowoffset+Editor.screenheight-1;
-                if (Editor.cursory>=Editor.numrows) {
-                    Editor.cursory=Editor.numrows-1;
-                }
-            } else if (key==PAGE_UP){
-                Editor.cursory=Editor.rowoffset;
+        case PAGE_DOWN:{
+            Editor.rowoffset+=Editor.screenheight;
+            Editor.cursory+=Editor.screenheight;
+            if (Editor.cursory>Editor.numrows) {
+                Editor.rowoffset=Editor.numrows-1;
+                Editor.cursory=Editor.numrows-1; 
             }
-            int times = Editor.screenheight;
-            while (times--){
-                movecursor(key==PAGE_UP?ARROW_UP:ARROW_DOWN);
+            if (Editor.cursorx>Editor.rows[Editor.cursory].len-1){
+                Editor.cursorx=Editor.rows[Editor.cursory].len-1;
+            }
+            break;
+        }
+        case PAGE_UP:{
+            Editor.rowoffset-=Editor.screenheight;
+            Editor.cursory-=Editor.screenheight;
+            if (Editor.cursory<0) {
+                Editor.rowoffset=0;
+                Editor.cursory=0; 
+            }
+            if (Editor.cursorx>Editor.rows[Editor.cursory].len-1){
+                Editor.cursorx=Editor.rows[Editor.cursory].len-1;
             }
             break;
         }
@@ -366,13 +376,12 @@ void drawrows(struct buffer *buff){
 }
 void drawStatusBar(struct buffer *buff){
     bufferAppend(buff, "\x1b[7m", 4 );//switch to inverted
-    char statusbar[80], rstatus[80];
-    int rlen=snprintf(rstatus, sizeof(rstatus), "%d",Editor.cursory+Editor.rowoffset);
+    char statusbar[80];
     int len; 
     if (Editor.filename){
-        len=snprintf(statusbar, sizeof(statusbar), "%.20s - %d lines",Editor.filename, Editor.numrows);
+        len=snprintf(statusbar, sizeof(statusbar), "%.20s - %25d lines",Editor.filename, Editor.numrows);
     } else{
-        len=snprintf(statusbar,sizeof(statusbar),"[No Name] - %d lines", Editor.numrows);
+        len=snprintf(statusbar,sizeof(statusbar),"[No Name] - %25d lines", Editor.numrows);
     }
     if (len>Editor.screenwidth) len= Editor.screenwidth;
     bufferAppend(buff, statusbar, len);
